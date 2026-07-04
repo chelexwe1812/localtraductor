@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Xcode — estado de UI por usuario (qué tienes abierto, breakpoints, etc.)
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Xcode — productos de build
+build/
+DerivedData/
+*.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+
+# Logs y crash reports
+*.log
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Cobertura / perf
+*.gcno
+*.gcda
