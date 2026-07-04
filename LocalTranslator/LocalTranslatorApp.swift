@@ -44,6 +44,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var welcomeWindow: WelcomeWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // App de barra de menús pura: sin icono en el Dock ni entrada en ⌘Tab.
+        // Equivalente en runtime a LSUIElement, sin tocar el Info.plist.
+        NSApp.setActivationPolicy(.accessory)
+
         Task { @MainActor in
             // ViewModel a nivel de app: el modelo MLX permanece cargado
             // en RAM entre apariciones/ocultamientos del popover.
