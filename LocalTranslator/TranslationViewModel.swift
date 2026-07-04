@@ -83,9 +83,12 @@ final class TranslationViewModel {
 
     // MARK: - Init
     /// Recibe el motor de traducción y la fuente de preferencias.
-    init(engine: TranslationEngine, settings: AppSettings = .shared) {
+    /// `settings` cae en `AppSettings.shared` dentro del cuerpo (y no como
+    /// valor por defecto del parámetro) porque los argumentos por defecto se
+    /// evalúan en contexto no aislado y `shared` está aislado al main actor.
+    init(engine: TranslationEngine, settings: AppSettings? = nil) {
         self.engine = engine
-        self.settings = settings
+        self.settings = settings ?? .shared
     }
 
     // MARK: - Carga del modelo

@@ -2,6 +2,9 @@ import Foundation
 import MLXLLM
 import MLXLMCommon
 import MLXHuggingFace
+// HuggingFace y Tokenizers no se usan directamente en este archivo, pero la
+// expansión del macro `#huggingFaceLoadModel` genera código que referencia
+// `HubClient` y `Tokenizers`: sin estos imports el proyecto no compila.
 import HuggingFace
 import Tokenizers
 import OSLog
@@ -81,7 +84,7 @@ actor MLXEngine: TranslationEngine {
         //    los placeholders `⟦Cn⟧` que la app inyecta para proteger
         //    código y URLs (ver `MarkdownCodePreserver`).
         let systemInstructions = """
-        You are a precise translator between English and Spanish. \
+        You are a precise translator. \
         Output ONLY the translated text — no quotes, no explanations, \
         no preamble, no language labels. Preserve the meaning, tone, \
         punctuation and paragraph breaks of the original. \

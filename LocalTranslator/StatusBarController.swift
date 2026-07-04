@@ -38,8 +38,8 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         popover = NSPopover()
-        // Compacto y de altura fija para que los dos cuadros (input/output)
-        // de 120 pt sean siempre iguales y el popover no crezca.
+        // Tamaño fijo, igual al frame que declara ContentView: el popover
+        // no debe crecer ni encoger con el contenido.
         popover.contentSize = NSSize(width: 460, height: 400)
         popover.behavior = .transient  // auto-dismiss al perder foco
         popover.animates = true

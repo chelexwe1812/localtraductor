@@ -1,6 +1,9 @@
 import Foundation
 
-enum Language: String, CaseIterable, Identifiable {
+/// `nonisolated` porque es un tipo de valor puro sin estado mutable: con la
+/// isolación por defecto en MainActor del proyecto, sin esto sus propiedades
+/// no podrían leerse desde el actor `MLXEngine`.
+nonisolated enum Language: String, CaseIterable, Identifiable {
     /// Detección automática del idioma de entrada. Solo válido como
     /// `sourceLanguage`: la UI lo filtra del picker de destino.
     case autoDetect = "auto"

@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct ContentView: View {
-    // El ViewModel ahora vive en LocalTranslatorApp para sobrevivir a
-    // ocultar/mostrar la ventana sin recargar el modelo.
+    // El ViewModel vive a nivel de app (AppDelegate) para que el modelo
+    // MLX permanezca cargado al ocultar/mostrar el popover.
     @Environment(TranslationViewModel.self) private var viewModel
     private let settings = AppSettings.shared
 
@@ -82,7 +82,7 @@ struct ContentView: View {
         // Configuración. Sin tarjetas: ambos cuadros ocupan todo el ancho.
         VStack(spacing: 0) {
             if settings.toolbarPosition == .top {
-                bottomBar
+                actionBar
                 Divider()
                 inputArea
                 Divider()
@@ -92,7 +92,7 @@ struct ContentView: View {
                 Divider()
                 outputArea
                 Divider()
-                bottomBar
+                actionBar
             }
         }
         .overlay(alignment: .top) { statusOverlay }
@@ -173,11 +173,11 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Barra inferior (pickers + acciones)
+    // MARK: - Barra de acciones (pickers + botones; arriba o abajo según ajuste)
     /// Prioridad de espacio: los nombres de los idiomas mandan. Solo cuando
     /// quepa la etiqueta del tono junto al icono ✦, `ViewThatFits` la incluye;
     /// en caso contrario, cae a la variante compacta con solo icono.
-    private var bottomBar: some View {
+    private var actionBar: some View {
         ViewThatFits(in: .horizontal) {
             barContent(showToneLabel: true)
             barContent(showToneLabel: false)
@@ -262,7 +262,7 @@ struct ContentView: View {
     /// Selector con estrella (✦) que cambia el registro con el que el modelo
     /// devuelve la traducción. Si `showLabel` es `true` muestra también el
     /// nombre del tono activo al lado del icono; si no, solo icono. La
-    /// decisión la toma `ViewThatFits` en `bottomBar` según el espacio
+    /// decisión la toma `ViewThatFits` en `actionBar` según el espacio
     /// disponible (los nombres de los idiomas tienen prioridad).
     private func toneMenu(showLabel: Bool) -> some View {
         Menu {
