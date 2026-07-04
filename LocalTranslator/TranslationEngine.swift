@@ -3,7 +3,9 @@ import Foundation
 /// Tono / registro de la traducción. Se inyecta como directiva en el
 /// prompt de usuario por cada llamada a `translate`, no en el system
 /// prompt — así cambiar de tono es instantáneo (no recarga el modelo).
-enum TranslationTone: String, CaseIterable, Identifiable, Hashable {
+/// `nonisolated` para que `MLXEngine` (actor propio) pueda leer `instruction`
+/// sin saltar al main actor, que es la isolación por defecto del proyecto.
+nonisolated enum TranslationTone: String, CaseIterable, Identifiable, Hashable {
     case neutral
     case formal
     case casual
@@ -45,11 +47,4 @@ protocol TranslationEngine: Sendable {
                    from source: Language,
                    to target: Language,
                    tone: TranslationTone) async throws -> AsyncThrowingStream<String, Error>
-}
-
-extension TranslationEngine {
-    /// Atajo cuando no necesitamos seguir el progreso.
-    func loadModel() async throws {
-        try await loadModel(progressHandler: nil)
-    }
 }
