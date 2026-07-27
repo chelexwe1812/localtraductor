@@ -139,7 +139,11 @@ struct ContentView: View {
                     .font(.body)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
-                    .padding(.horizontal, 12)
+                    .padding(.leading, 12)
+                    // Margen extra a la derecha: reserva la columna donde
+                    // flota el botón de copiar para que el texto traducido
+                    // nunca quede debajo del icono.
+                    .padding(.trailing, 40)
                     .padding(.vertical, 10)
                 // Ancla invisible al final del contenido: `scrollTo` la
                 // posiciona al borde inferior del viewport, dejando el
