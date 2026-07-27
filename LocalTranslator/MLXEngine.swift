@@ -37,8 +37,15 @@ actor MLXEngine: TranslationEngine {
     /// salto al actor.
     private nonisolated let log = Logger(subsystem: "LocalTranslator", category: "MLXEngine")
 
-    init(modelID: String = "mlx-community/Qwen3-4B-Instruct-2507-4bit") {
+    init(modelID: String = ModelStorage.modelID) {
         self.modelID = modelID
+    }
+
+    /// Suelta la sesión (y con ella el modelo) para que MLX libere los
+    /// ~2.5 GB de RAM. Se usa al eliminar el modelo desde Configuración.
+    func unload() {
+        session = nil
+        log.info("Modelo descargado de memoria")
     }
 
     // MARK: - Carga del modelo
@@ -158,11 +165,23 @@ private func loadMLXModelContext(
 
 enum EngineError: LocalizedError {
     case modelNotLoaded
+    /// El traductor del sistema soporta el par pero los paquetes de idioma
+    /// aún no están descargados. El ViewModel lo captura para lanzar el
+    /// flujo de descarga (ver `LanguageDownloadWindowController`).
+    case languagesNotInstalled(source: Language, target: Language)
+    /// El traductor del sistema no soporta este par de idiomas.
+    case languagePairUnsupported(source: Language, target: Language)
 
     var errorDescription: String? {
+        // `String(localized:)` para que el mensaje siga el idioma del
+        // sistema; estos textos acaban dentro del "Error: %@" de la UI.
         switch self {
         case .modelNotLoaded:
-            return "El modelo aún no está cargado."
+            return String(localized: "El modelo aún no está cargado.")
+        case .languagesNotInstalled:
+            return String(localized: "Faltan idiomas de traducción por descargar.")
+        case let .languagePairUnsupported(source, target):
+            return String(localized: "El traductor del sistema no soporta \(source.englishName) → \(target.englishName).")
         }
     }
 }

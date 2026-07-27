@@ -51,6 +51,11 @@ struct ContentView: View {
                   !text.hasPrefix("⚠️") else { return }
             copyToClipboard(text)
         }
+        .onChange(of: settings.translationEngineKind) { _, _ in
+            // El ViewModel decide si hay que cargar el LLM (al volver a
+            // "IA local" sin haberlo cargado antes) o si está listo ya.
+            viewModel.engineKindDidChange()
+        }
         .onChange(of: settings.translationTone) { _, _ in
             // Al cambiar de tono, re-traducimos al instante si hay algo que
             // traducir. Si el input está vacío no hacemos nada para no
@@ -134,7 +139,11 @@ struct ContentView: View {
                     .font(.body)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
-                    .padding(.horizontal, 12)
+                    .padding(.leading, 12)
+                    // Margen extra a la derecha: reserva la columna donde
+                    // flota el botón de copiar para que el texto traducido
+                    // nunca quede debajo del icono.
+                    .padding(.trailing, 40)
                     .padding(.vertical, 10)
                 // Ancla invisible al final del contenido: `scrollTo` la
                 // posiciona al borde inferior del viewport, dejando el
@@ -209,7 +218,11 @@ struct ContentView: View {
             // queda hueco real entre los pickers y los iconos de acción.
             Spacer(minLength: 8)
 
-            toneMenu(showLabel: showToneLabel)
+            // El tono es una directiva de prompt del LLM: el traductor del
+            // sistema no lo entiende, así que se oculta con ese motor.
+            if settings.translationEngineKind == .localLLM {
+                toneMenu(showLabel: showToneLabel)
+            }
 
             Button {
                 viewModel.clearInput()

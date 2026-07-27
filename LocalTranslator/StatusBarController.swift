@@ -50,10 +50,14 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         popover.delegate = self
 
         if let button = statusItem.button {
-            button.image = NSImage(
-                systemSymbolName: "globe",
-                accessibilityDescription: "LocalTranslator"
-            )
+            // Icono propio (PDF vectorial monocromo) en modo template:
+            // macOS usa solo su canal alfa y lo tiñe según la apariencia
+            // de la barra (claro/oscuro) y el estado resaltado.
+            let icon = NSImage(named: "MenuBarIcon")
+            icon?.size = NSSize(width: 18, height: 18)
+            icon?.isTemplate = true
+            icon?.accessibilityDescription = "LocalTranslator"
+            button.image = icon
             button.target = self
             button.action = #selector(handleClick(_:))
             // Por defecto el botón solo dispara con click izquierdo.
@@ -173,7 +177,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(
-            title: String(localized: "Cerrar LocalTranslator", locale: locale),
+            title: String(localized: "Salir de LocalTranslator", locale: locale),
             action: #selector(quitApp),
             keyEquivalent: "q"
         )

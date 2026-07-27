@@ -13,7 +13,18 @@ struct WelcomeRootView: View {
     let viewModel: TranslationViewModel
     let onFinish: () -> Void
 
-    @State private var step: Step = .intro
+    @State private var step: Step
+
+    /// `initialStep` permite a los previews abrir directamente un paso
+    /// concreto (p. ej. la pantalla de confirmación). En producción se usa
+    /// siempre el valor por defecto `.intro`.
+    init(viewModel: TranslationViewModel,
+         onFinish: @escaping () -> Void,
+         initialStep: Step = .intro) {
+        self.viewModel = viewModel
+        self.onFinish = onFinish
+        self._step = State(initialValue: initialStep)
+    }
 
     /// Coreografía de la transición al completarse la descarga: el icono
     /// de descarga se encoge, se sustituye por el check verde con un "pop"
@@ -270,6 +281,27 @@ struct WelcomeRootView: View {
                 .keyboardShortcut(.cancelAction)
                 .controlSize(.large)
                 .buttonStyle(.bordered)
+
+                // Salida discreta para quien no quiera descargar 2.5 GB:
+                // termina la onboarding usando el traductor del sistema.
+                // A propósito sin protagonismo (caption, estilo enlace):
+                // el camino principal sigue siendo descargar el modelo.
+                Button {
+                    skipDownloadAndUseSystemTranslator()
+                } label: {
+                    VStack(spacing: 2) {
+                        Text("Continuar sin descargar y usar el traductor del sistema")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .underline()
+                        Text("Podrás descargar el modelo más tarde desde Configuración.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .multilineTextAlignment(.center)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
             }
             // Limitamos el ancho del grupo de botones para que no se
             // estiren a todo el alto del padding: con esto los dos quedan
@@ -510,12 +542,31 @@ struct WelcomeRootView: View {
         iconScale = 1.0
         Task { await viewModel.loadModel() }
     }
+
+    /// Camino alternativo discreto: sin descarga. Deja el traductor del
+    /// sistema como motor activo, marca el estado como listo y cierra la
+    /// onboarding. El modelo LLM se puede descargar después desde
+    /// Configuración (la opción "IA local" queda desactivada hasta entonces).
+    private func skipDownloadAndUseSystemTranslator() {
+        settings.translationEngineKind = .appleTranslation
+        // Con el motor del sistema, loadModel() resuelve a .ready al instante.
+        Task { await viewModel.loadModel() }
+        onFinish()
+    }
 }
 
 #Preview("Intro") {
     WelcomeRootView(
         viewModel: TranslationViewModel(engine: MockEngine()),
         onFinish: {}
+    )
+}
+
+#Preview("Confirmación") {
+    WelcomeRootView(
+        viewModel: TranslationViewModel(engine: MockEngine()),
+        onFinish: {},
+        initialStep: .confirm
     )
 }
 // MARK: - CelebrationBurst
