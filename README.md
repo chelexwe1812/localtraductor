@@ -5,6 +5,7 @@ Traductor privado para macOS que vive en la barra de menús. Corre un modelo de 
 ## Características
 
 - **Privacidad total** — La inferencia ocurre en tu Mac con [MLX](https://github.com/ml-explore/mlx-swift). Sin nube, sin cuentas, sin telemetría. Tras la descarga inicial del modelo funciona sin internet.
+- **Dos motores de traducción** — El modelo de IA local (matices, tonos, textos largos) o el traductor del sistema de macOS (framework Translation: instantáneo y ligero, también offline). Se cambia en Configuración; el modelo de IA se puede eliminar para liberar los ~2.5 GB y re-descargar cuando quieras.
 - **12 idiomas** — Inglés, español, francés, alemán, italiano, portugués, ruso, japonés, coreano, árabe y chino (simplificado y tradicional), con detección automática del idioma de origen (on-device, con `NLLanguageRecognizer`).
 - **Tonos de traducción** — Neutro, formal, casual o técnico: el registro de la salida se ajusta con un clic.
 - **Streaming** — La traducción aparece palabra a palabra según la genera el modelo.
@@ -30,7 +31,7 @@ La primera vez que abres la app, una pantalla de bienvenida descarga **Qwen3-4B 
 
 1. Clona el repositorio y abre `LocalTranslator.xcodeproj` en Xcode.
 2. Espera a que se resuelvan los paquetes Swift (mlx-swift-lm, swift-transformers, KeyboardShortcuts…). Xcode pedirá aprobar el plugin de compilación de `mlx-swift` y las macros de `mlx-swift-lm` la primera vez: acepta con *Trust & Enable*.
-3. Compila y ejecuta (`⌘R`). La app aparece como un globo 🌐 en la barra de menús; no tiene ventana principal ni icono en el Dock.
+3. Compila y ejecuta (`⌘R`). La app aparece como un icono A/技 en la barra de menús; no tiene ventana principal ni icono en el Dock.
 
 Los tests unitarios (framework Swift Testing) se corren con `⌘U`.
 
@@ -60,3 +61,7 @@ La UI habla con el motor solo a través del protocolo `TranslationEngine`, así 
 ## Privacidad
 
 LocalTranslator no tiene analytics ni hace peticiones de red, con una única excepción: la descarga inicial del modelo desde Hugging Face. Todo lo que traduces se procesa y se queda en tu Mac.
+
+## Historial de cambios
+
+Versión actual: **0.2** (en verificación, aún sin publicar). El detalle de cada versión está en el [CHANGELOG](CHANGELOG.md).
