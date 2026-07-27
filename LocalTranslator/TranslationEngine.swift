@@ -47,4 +47,14 @@ protocol TranslationEngine: Sendable {
                    from source: Language,
                    to target: Language,
                    tone: TranslationTone) async throws -> AsyncThrowingStream<String, Error>
+
+    /// Libera de la memoria los recursos pesados del motor (si los hay).
+    /// Tras llamarlo, hace falta un nuevo `loadModel` para volver a traducir.
+    func unload() async
+}
+
+extension TranslationEngine {
+    /// Por defecto no hay nada que liberar: solo el motor MLX mantiene
+    /// un modelo grande en RAM.
+    func unload() async {}
 }

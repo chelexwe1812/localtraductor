@@ -66,6 +66,22 @@ final class TranslationViewModel {
     /// incrementamos en `requestInputFocus()` y la vista hace `onChange`.
     var focusInputToken: Int = 0
 
+    /// `true` si los pesos del modelo LLM están en el caché de disco.
+    /// Configuración lo usa para decidir entre "Eliminar" y "Descargar" y
+    /// para desactivar la opción "IA local" cuando no hay modelo.
+    var isModelDownloaded: Bool = false
+
+    /// Tamaño del modelo en disco ya formateado ("2,5 GB"). `nil` cuando
+    /// el modelo no está descargado.
+    var modelSizeOnDisk: String?
+
+    /// `true` mientras corre la descarga manual lanzada desde Configuración.
+    var isDownloadingModel: Bool = false
+
+    /// Mensaje de error de la última operación de gestión del modelo
+    /// (descarga o borrado). `nil` cuando no hay error que mostrar.
+    var modelActionError: String?
+
     // MARK: - Dependencias y tareas internas
     /// Motor LLM local (MLX). Se inyecta para poder usar `MockEngine` en
     /// previews y tests.
@@ -105,6 +121,7 @@ final class TranslationViewModel {
         self.llmEngine = engine
         self.appleEngine = AppleTranslationEngine()
         self.settings = settings ?? .shared
+        refreshModelStorageInfo()
     }
 
     // MARK: - Carga del modelo
@@ -127,6 +144,84 @@ final class TranslationViewModel {
             modelState = .ready
         } catch {
             modelState = .failed(error.localizedDescription)
+        }
+        // La carga puede haber implicado la descarga inicial de los pesos:
+        // refrescamos el estado en disco para Configuración.
+        refreshModelStorageInfo()
+    }
+
+    // MARK: - Gestión del modelo en disco (Configuración)
+
+    /// Relee del disco si el modelo está descargado y cuánto ocupa.
+    func refreshModelStorageInfo() {
+        isModelDownloaded = ModelStorage.isDownloaded
+        modelSizeOnDisk = isModelDownloaded
+            ? ModelStorage.sizeOnDisk().map {
+                ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)
+            }
+            : nil
+    }
+
+    /// Elimina los pesos del modelo del disco y lo descarga de la RAM.
+    /// Si el motor activo era el LLM, cambia automáticamente al traductor
+    /// del sistema para que la app siga funcionando.
+    func deleteLocalModel() {
+        modelActionError = nil
+        translationTask?.cancel()
+        isTranslating = false
+
+        do {
+            try ModelStorage.deleteModel()
+        } catch {
+            modelActionError = String(
+                localized: "No se pudo eliminar el modelo: \(error.localizedDescription)",
+                locale: settings.appLanguage.locale
+            )
+        }
+
+        // Liberamos también la copia en RAM: sin esto, borrar solo ahorraría
+        // disco pero el modelo seguiría ocupando ~2.5 GB de memoria.
+        Task { [llmEngine] in
+            await llmEngine.unload()
+        }
+        llmLoaded = false
+        refreshModelStorageInfo()
+
+        if settings.translationEngineKind == .localLLM {
+            // El onChange de ContentView invoca engineKindDidChange(),
+            // que dejará modelState en .ready para el motor del sistema.
+            settings.translationEngineKind = .appleTranslation
+        }
+    }
+
+    /// Descarga (y carga) de nuevo el modelo desde Configuración. Al
+    /// terminar, la opción "IA local" vuelve a estar disponible.
+    func downloadLocalModel() {
+        guard !isDownloadingModel else { return }
+        modelActionError = nil
+        isDownloadingModel = true
+        downloadProgress = 0
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.llmEngine.loadModel { [weak self] progress in
+                    Task { @MainActor [weak self] in
+                        self?.downloadProgress = progress
+                    }
+                }
+                self.llmLoaded = true
+                if self.settings.translationEngineKind == .localLLM {
+                    self.modelState = .ready
+                }
+            } catch {
+                self.modelActionError = String(
+                    localized: "No se pudo descargar el modelo: \(error.localizedDescription)",
+                    locale: self.settings.appLanguage.locale
+                )
+            }
+            self.isDownloadingModel = false
+            self.refreshModelStorageInfo()
         }
     }
 

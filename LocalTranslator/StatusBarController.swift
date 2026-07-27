@@ -173,7 +173,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(
-            title: String(localized: "Cerrar LocalTranslator", locale: locale),
+            title: String(localized: "Salir de LocalTranslator", locale: locale),
             action: #selector(quitApp),
             keyEquivalent: "q"
         )
