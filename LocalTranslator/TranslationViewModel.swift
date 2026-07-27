@@ -17,9 +17,6 @@ final class TranslationViewModel {
     var screen: Screen = .translator
     var inputText: String = "" {
         didSet {
-            if sourceLanguage == .autoDetect || settings.autoDetectLanguage {
-                updateDetectedLanguage()
-            }
             handleInputChange()
         }
     }
@@ -70,12 +67,30 @@ final class TranslationViewModel {
     var focusInputToken: Int = 0
 
     // MARK: - Dependencias y tareas internas
-    private let engine: TranslationEngine
+    /// Motor LLM local (MLX). Se inyecta para poder usar `MockEngine` en
+    /// previews y tests.
+    private let llmEngine: TranslationEngine
+    /// Motor del sistema (framework Translation de Apple). No requiere
+    /// carga pesada, así que se crea siempre.
+    private let appleEngine: TranslationEngine
     private let settings: AppSettings
     private var translationTask: Task<Void, Never>?
     private var debounceTask: Task<Void, Never>?
     private let debounceDelay: Duration = .milliseconds(450)
     private let languageRecognizer = NLLanguageRecognizer()
+
+    /// `true` cuando el modelo LLM ya está cargado en RAM. Permite volver
+    /// al motor de IA sin recargar si ya se cargó en esta sesión.
+    private var llmLoaded = false
+
+    /// Ventana del flujo de descarga de idiomas del traductor del sistema.
+    /// `nil` cuando no hay descarga en curso.
+    private var languageDownloadWindow: LanguageDownloadWindowController?
+
+    /// Motor que atiende la traducción según la preferencia del usuario.
+    private var activeEngine: TranslationEngine {
+        settings.translationEngineKind == .appleTranslation ? appleEngine : llmEngine
+    }
 
     /// Último contenido del portapapeles que esta sesión ya "consumió". Sirve
     /// para que el auto-pegado al abrir no repita el mismo texto cada vez.
@@ -87,23 +102,51 @@ final class TranslationViewModel {
     /// valor por defecto del parámetro) porque los argumentos por defecto se
     /// evalúan en contexto no aislado y `shared` está aislado al main actor.
     init(engine: TranslationEngine, settings: AppSettings? = nil) {
-        self.engine = engine
+        self.llmEngine = engine
+        self.appleEngine = AppleTranslationEngine()
         self.settings = settings ?? .shared
     }
 
     // MARK: - Carga del modelo
     func loadModel() async {
+        // El traductor del sistema no necesita carga: listo al instante.
+        // El LLM se cargará más tarde solo si el usuario cambia de motor.
+        guard settings.translationEngineKind == .localLLM else {
+            modelState = .ready
+            return
+        }
         modelState = .loading
         downloadProgress = 0
         do {
-            try await engine.loadModel { [weak self] progress in
+            try await llmEngine.loadModel { [weak self] progress in
                 Task { @MainActor [weak self] in
                     self?.downloadProgress = progress
                 }
             }
+            llmLoaded = true
             modelState = .ready
         } catch {
             modelState = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Reacciona al cambio de motor en Configuración. Al pasar al traductor
+    /// del sistema no hay nada que cargar; al volver al LLM, se carga solo
+    /// si no se cargó antes en esta sesión (si ya está en RAM, es gratis).
+    func engineKindDidChange() {
+        translationTask?.cancel()
+        isTranslating = false
+        switch settings.translationEngineKind {
+        case .appleTranslation:
+            modelState = .ready
+        case .localLLM:
+            if llmLoaded {
+                modelState = .ready
+            } else {
+                Task { [weak self] in
+                    await self?.loadModel()
+                }
+            }
         }
     }
 
@@ -199,15 +242,16 @@ final class TranslationViewModel {
 
         guard modelState == .ready else { return }
 
-        // Red de seguridad: si seguimos en .autoDetect al pulsar Enter,
-        // forzamos una detección sobre el snapshot. El didSet de inputText
-        // ya intenta detectar mientras se escribe, pero textos muy cortos
-        // se ignoran allí y pueden llegar aquí sin haber actualizado el
-        // picker.
-        if sourceLanguage == .autoDetect {
+        // La detección ocurre aquí, al lanzar la traducción, y no mientras
+        // se escribe: con frases a medias el detector confundía idiomas
+        // cercanos (español ↔ italiano/portugués) y el picker saltaba de
+        // idioma a mitad de escritura. Sobre el texto completo la detección
+        // es mucho más fiable.
+        if sourceLanguage == .autoDetect || settings.autoDetectLanguage {
             if let detected = detectLanguage(for: textSnapshot) {
                 sourceLanguage = detected
-            } else {
+            } else if sourceLanguage == .autoDetect {
+                // Sin idioma concreto en el picker no podemos continuar.
                 // Prependemos el emoji a mano (no entra en el catálogo) para
                 // evitar colisiones de símbolos auto-generados con otras
                 // entradas que solo se diferenciaban por el prefijo.
@@ -217,6 +261,8 @@ final class TranslationViewModel {
                 )
                 return
             }
+            // Si la detección no es concluyente pero el picker ya tiene un
+            // idioma concreto, seguimos con ese sin molestar al usuario.
         }
 
         // Si tras detectar coincide con el destino, no hay traducción posible.
@@ -239,7 +285,7 @@ final class TranslationViewModel {
         translationTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let stream = try await self.engine.translate(
+                let stream = try await self.activeEngine.translate(
                     sanitized,
                     from: self.sourceLanguage,
                     to: self.targetLanguage,
@@ -260,6 +306,11 @@ final class TranslationViewModel {
                 self.outputText = final
             } catch is CancellationError {
                 // Traducción descartada por una nueva: no hacemos nada
+            } catch EngineError.languagesNotInstalled(let source, let target) {
+                // El traductor del sistema soporta el par pero falta
+                // descargarlo: abrimos el flujo de descarga y reintentamos
+                // al completarse.
+                self.requestLanguageDownload(source: source, target: target)
             } catch {
                 self.outputText = "⚠️ " + String(
                     localized: "Error: \(error.localizedDescription)",
@@ -267,6 +318,28 @@ final class TranslationViewModel {
                 )
             }
             self.isTranslating = false
+        }
+    }
+
+    // MARK: - Descarga de idiomas del traductor del sistema
+
+    /// Abre la ventana que pide al sistema descargar el par de idiomas y,
+    /// si la descarga termina bien, relanza la traducción pendiente.
+    private func requestLanguageDownload(source: Language, target: Language) {
+        guard languageDownloadWindow == nil else { return }
+        let controller = LanguageDownloadWindowController()
+        languageDownloadWindow = controller
+        controller.show(source: source, target: target) { [weak self] success in
+            guard let self else { return }
+            self.languageDownloadWindow = nil
+            if success {
+                self.translate()
+            } else {
+                self.outputText = "⚠️ " + String(
+                    localized: "No se descargaron los idiomas de traducción.",
+                    locale: self.settings.appLanguage.locale
+                )
+            }
         }
     }
 
@@ -289,8 +362,8 @@ final class TranslationViewModel {
 
     /// Pasa `inputText` por el detector y, si hay un idioma fiable,
     /// actualiza `sourceLanguage` para que el picker refleje la detección.
-    /// Se invoca cuando el usuario eligió `.autoDetect` en el picker o tiene
-    /// activo el ajuste `autoDetectLanguage` en Configuración.
+    /// Solo se invoca cuando el usuario elige `.autoDetect` en el picker con
+    /// texto ya escrito; mientras se teclea NO se detecta (ver `translate()`).
     private func updateDetectedLanguage() {
         guard let detected = detectLanguage(for: inputText) else { return }
         guard detected != sourceLanguage else { return }
@@ -305,6 +378,15 @@ final class TranslationViewModel {
         guard trimmed.count >= 4 else { return nil }
 
         languageRecognizer.reset()
+        // Restringimos las hipótesis a los idiomas que la app soporta y
+        // sesgamos hacia el par que ya está en los pickers: con frases
+        // cortas el reconocedor confundía español con italiano/portugués,
+        // y lo más probable es que el usuario siga con su par habitual.
+        languageRecognizer.languageConstraints = Self.supportedNLLanguages
+        var hints: [NLLanguage: Double] = [:]
+        if let source = sourceLanguage.nlLanguage { hints[source] = 0.4 }
+        if let target = targetLanguage.nlLanguage { hints[target] = 0.2 }
+        languageRecognizer.languageHints = hints
         languageRecognizer.processString(trimmed)
 
         let hypotheses = languageRecognizer.languageHypotheses(withMaximum: 1)
@@ -325,6 +407,34 @@ final class TranslationViewModel {
         case .simplifiedChinese: return .chineseSimplified
         case .traditionalChinese: return .chineseTraditional
         default: return nil
+        }
+    }
+
+    /// Lista de idiomas que el detector puede proponer: exactamente los que
+    /// la app soporta. Sin esta restricción el reconocedor puede sugerir
+    /// idiomas fuera del catálogo (catalán, gallego…) que luego se descartan.
+    private static let supportedNLLanguages: [NLLanguage] =
+        Language.allCases.compactMap(\.nlLanguage)
+}
+
+/// Mapeo inverso al de `detectLanguage`: del enum propio de la app al tipo
+/// de NaturalLanguage, para configurar constraints y hints del detector.
+private extension Language {
+    var nlLanguage: NLLanguage? {
+        switch self {
+        case .autoDetect: return nil
+        case .english: return .english
+        case .spanish: return .spanish
+        case .french: return .french
+        case .german: return .german
+        case .italian: return .italian
+        case .portuguese: return .portuguese
+        case .russian: return .russian
+        case .japanese: return .japanese
+        case .korean: return .korean
+        case .arabic: return .arabic
+        case .chineseSimplified: return .simplifiedChinese
+        case .chineseTraditional: return .traditionalChinese
         }
     }
 }

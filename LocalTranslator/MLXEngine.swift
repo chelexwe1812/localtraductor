@@ -158,11 +158,21 @@ private func loadMLXModelContext(
 
 enum EngineError: LocalizedError {
     case modelNotLoaded
+    /// El traductor del sistema soporta el par pero los paquetes de idioma
+    /// aún no están descargados. El ViewModel lo captura para lanzar el
+    /// flujo de descarga (ver `LanguageDownloadWindowController`).
+    case languagesNotInstalled(source: Language, target: Language)
+    /// El traductor del sistema no soporta este par de idiomas.
+    case languagePairUnsupported(source: Language, target: Language)
 
     var errorDescription: String? {
         switch self {
         case .modelNotLoaded:
             return "El modelo aún no está cargado."
+        case .languagesNotInstalled:
+            return "Faltan idiomas de traducción por descargar."
+        case let .languagePairUnsupported(source, target):
+            return "El traductor del sistema no soporta \(source.englishName) → \(target.englishName)."
         }
     }
 }

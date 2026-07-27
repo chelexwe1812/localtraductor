@@ -16,6 +16,26 @@ struct SettingsView: View {
 
             ScrollView {
                 Form {
+                    Section("Motor de traducción") {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Motor")
+                                Text("\"IA local\" usa el modelo LLM descargado: mejor con matices, tonos y textos largos. \"Sistema (Apple)\" usa el traductor de macOS: instantáneo y ligero, pero sin tonos.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Picker("", selection: $settings.translationEngineKind) {
+                                ForEach(TranslationEngineKind.allCases) { kind in
+                                    Text(kind.displayName).tag(kind)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .fixedSize()
+                        }
+                    }
+
                     Section("Comportamiento") {
                         Toggle(isOn: $settings.autoTranslate) {
                             VStack(alignment: .leading, spacing: 2) {

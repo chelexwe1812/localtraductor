@@ -51,6 +51,11 @@ struct ContentView: View {
                   !text.hasPrefix("⚠️") else { return }
             copyToClipboard(text)
         }
+        .onChange(of: settings.translationEngineKind) { _, _ in
+            // El ViewModel decide si hay que cargar el LLM (al volver a
+            // "IA local" sin haberlo cargado antes) o si está listo ya.
+            viewModel.engineKindDidChange()
+        }
         .onChange(of: settings.translationTone) { _, _ in
             // Al cambiar de tono, re-traducimos al instante si hay algo que
             // traducir. Si el input está vacío no hacemos nada para no
@@ -209,7 +214,11 @@ struct ContentView: View {
             // queda hueco real entre los pickers y los iconos de acción.
             Spacer(minLength: 8)
 
-            toneMenu(showLabel: showToneLabel)
+            // El tono es una directiva de prompt del LLM: el traductor del
+            // sistema no lo entiende, así que se oculta con ese motor.
+            if settings.translationEngineKind == .localLLM {
+                toneMenu(showLabel: showToneLabel)
+            }
 
             Button {
                 viewModel.clearInput()

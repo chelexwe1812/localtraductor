@@ -57,6 +57,24 @@ extension TranslationTone {
     }
 }
 
+/// Motor que realiza las traducciones.
+/// `localLLM` usa el modelo MLX descargado (matices, tonos, markdown);
+/// `appleTranslation` usa el framework Translation del sistema: instantáneo
+/// y ligero, pero sin tonos.
+enum TranslationEngineKind: String, CaseIterable, Identifiable {
+    case localLLM = "llm"
+    case appleTranslation = "apple"
+
+    var id: String { rawValue }
+
+    var displayName: LocalizedStringKey {
+        switch self {
+        case .localLLM: return "IA local"
+        case .appleTranslation: return "Sistema (Apple)"
+        }
+    }
+}
+
 /// Posición de la barra de herramientas en la pantalla del traductor.
 /// `top` la coloca encima del input; `bottom` debajo del output.
 enum ToolbarPosition: String, CaseIterable, Identifiable {
@@ -171,6 +189,12 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(translationTone.rawValue, forKey: Keys.translationTone) }
     }
 
+    /// Motor de traducción activo: el LLM local (MLX) o el traductor del
+    /// sistema (framework Translation de Apple).
+    var translationEngineKind: TranslationEngineKind {
+        didSet { UserDefaults.standard.set(translationEngineKind.rawValue, forKey: Keys.translationEngineKind) }
+    }
+
     /// Posición de la barra de herramientas: arriba o debajo del par
     /// entrada/salida.
     var toolbarPosition: ToolbarPosition {
@@ -217,6 +241,12 @@ final class AppSettings {
         } else {
             self.toolbarPosition = .top
         }
+        if let raw = d.string(forKey: Keys.translationEngineKind),
+           let kind = TranslationEngineKind(rawValue: raw) {
+            self.translationEngineKind = kind
+        } else {
+            self.translationEngineKind = .localLLM
+        }
         self.hasShownWelcome = d.bool(forKey: Keys.hasShownWelcome)
     }
 
@@ -237,6 +267,7 @@ final class AppSettings {
         static let colorScheme = "colorScheme"
         static let appLanguage = "appLanguage"
         static let translationTone = "translationTone"
+        static let translationEngineKind = "translationEngineKind"
         static let toolbarPosition = "toolbarPosition"
         static let hasShownWelcome = "hasShownWelcome"
     }
