@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // arrancar con el Mac: el Info.plist lo lee `launchd` antes de ejecutar
         // nuestro código, así que la app nunca llega a aparecer en el Dock,
         // mientras que hacerlo en runtime deja una ventana en la que parpadea.
+
         // Antes que nada: crear la carpeta del modelo y, si venimos de una
         // versión que lo guardaba en Library/Caches, subirlo a Application
         // Support. Tiene que ir antes del ViewModel, cuyo init ya pregunta si
