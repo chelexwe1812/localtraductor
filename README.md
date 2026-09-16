@@ -15,6 +15,7 @@ Traductor privado para macOS que vive en la barra de menús. Corre un modelo de 
   - `⇧⌥⌘C` — traducir el contenido del portapapeles al instante.
   - Ambos reasignables en Configuración.
 - **Comodidades opcionales** — Traducción automática al escribir (con debounce), copiar el resultado al portapapeles, pegar y traducir el portapapeles al abrir, vaciar al cerrar.
+- **Abrir al iniciar sesión** — Opcional, en Configuración. Arranca con el Mac y queda lista en la barra de menús.
 - **Interfaz en español e inglés**, modo claro / oscuro / sistema.
 
 ## El modelo
@@ -23,9 +24,29 @@ La primera vez que abres la app, una pantalla de bienvenida descarga **Qwen3-4B 
 
 ## Requisitos
 
-- Mac con **Apple Silicon** (la inferencia usa Metal vía MLX).
-- **macOS 26** o posterior.
+- Mac con **Apple Silicon** (M1 o posterior). La inferencia corre sobre Metal vía MLX, así que **no funciona en Macs con Intel**.
+- **macOS 26.0** o posterior.
 - Para compilar: **Xcode 26** o posterior.
+
+> El motor "Sistema (Apple)" usa traducciones de mayor fidelidad (modelos de Apple Intelligence) a partir de macOS 26.4. En 26.0–26.3 recurre a los modelos tradicionales del sistema, que funcionan igual pero con algo menos de fluidez.
+
+## Instalación
+
+Descarga el `.dmg` de la [última release](../../releases/latest), ábrelo y arrastra LocalTranslator a `Applications`.
+
+### La primera vez macOS dirá que la app está dañada
+
+No lo está. LocalTranslator **no está firmada con un certificado de distribución de Apple** ni notarizada, porque eso requiere una membresía de pago del Apple Developer Program. Cuando macOS descarga un archivo le añade un atributo de cuarentena, y Gatekeeper bloquea cualquier app cuarentenada que no venga notarizada — con ese mensaje tan alarmante como engañoso.
+
+Para quitar la cuarentena, una sola vez, tras copiar la app a `Applications`:
+
+```sh
+xattr -r -d com.apple.quarantine /Applications/LocalTranslator.app
+```
+
+Después ábrela normalmente. El atributo no vuelve a aparecer.
+
+Si prefieres no ejecutar comandos que no entiendes —una postura razonable—, [compila la app tú mismo](#compilar-y-ejecutar): el código es este mismo repositorio y Xcode la firma localmente, así que no pasa por cuarentena.
 
 ## Compilar y ejecutar
 
@@ -49,8 +70,12 @@ LocalTranslator/
 │                                 preservación de código/markdown vía MarkdownCodePreserver)
 ├── TranslationEngine.swift       Protocolo del motor + tonos de traducción
 ├── MLXEngine.swift               Motor real: actor que corre Qwen3-4B con MLX
+├── AppleTranslationEngine.swift  Motor del sistema (framework Translation de macOS)
 ├── MockEngine.swift              Motor simulado para previews de SwiftUI
+├── LanguageDownloadWindow.swift  Ventana del flujo de descarga de idiomas del sistema
+├── ModelStorage.swift            Ubicación, tamaño y borrado de los pesos en disco
 ├── AppSettings.swift             Preferencias persistentes (UserDefaults, @Observable)
+├── LaunchAtLogin.swift           Registro como ítem de inicio (SMAppService)
 ├── Language.swift                Idiomas soportados
 ├── ModelState.swift              Estados del ciclo de vida del modelo
 └── GlobalShortcut.swift          Definición de los atajos globales (KeyboardShortcuts)
@@ -62,6 +87,23 @@ La UI habla con el motor solo a través del protocolo `TranslationEngine`, así 
 
 LocalTranslator no tiene analytics ni hace peticiones de red, con una única excepción: la descarga inicial del modelo desde Hugging Face. Todo lo que traduces se procesa y se queda en tu Mac.
 
+Los pesos del modelo viven en `~/Library/Containers/com.dorami.LocalTranslator/Data/Library/Application Support/LocalTranslator/`, dentro del contenedor sandbox de la app, y están excluidos de las copias de seguridad (son re-descargables, no datos tuyos). Puedes borrarlos desde Configuración en cualquier momento.
+
+## Publicar una release
+
+```sh
+./scripts/release.sh
+```
+
+Archiva en Release para arm64, empaqueta el `.dmg` en `build/` y calcula su SHA-256. La versión se lee de `MARKETING_VERSION`, así que el nombre del archivo nunca puede divergir de la que lleva el bundle dentro.
+
+Si algún día hay certificado de distribución, el mismo script firma y notariza:
+
+```sh
+DEVELOPER_ID="Developer ID Application: … (TEAMID)" \
+NOTARY_PROFILE="mi-perfil" ./scripts/release.sh
+```
+
 ## Historial de cambios
 
-Versión actual: **0.2** (en verificación, aún sin publicar). El detalle de cada versión está en el [CHANGELOG](CHANGELOG.md).
+Versión actual: **1.1.0**. El detalle de cada versión está en el [CHANGELOG](CHANGELOG.md).

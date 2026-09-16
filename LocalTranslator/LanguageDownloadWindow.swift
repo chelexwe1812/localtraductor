@@ -30,16 +30,27 @@ final class LanguageDownloadWindowController {
         }
         onFinish = completion
 
-        let view = LanguageDownloadView(
-            // Misma estrategia que usa `AppleTranslationEngine` al traducir:
-            // si pidiéramos la descarga con una estrategia y tradujéramos con
-            // otra, el sistema podría preparar unos modelos y la sesión pedir
-            // otros, dejando al usuario en un bucle de descarga.
-            configuration: TranslationSession.Configuration(
+        // Misma estrategia que usa `AppleTranslationEngine` al traducir: si
+        // pidiéramos la descarga con una estrategia y tradujéramos con otra,
+        // el sistema podría preparar unos modelos y la sesión pedir otros,
+        // dejando al usuario en un bucle de descarga. `preferredStrategy`
+        // existe desde macOS 26.4; antes solo hay una estrategia posible.
+        let configuration: TranslationSession.Configuration
+        if #available(macOS 26.4, *) {
+            configuration = TranslationSession.Configuration(
                 source: sourceLanguage,
                 target: targetLanguage,
-                preferredStrategy: AppleTranslationEngine.downloadStrategy
-            ),
+                preferredStrategy: .highFidelity
+            )
+        } else {
+            configuration = TranslationSession.Configuration(
+                source: sourceLanguage,
+                target: targetLanguage
+            )
+        }
+
+        let view = LanguageDownloadView(
+            configuration: configuration,
             sourceName: source.englishName,
             targetName: target.englishName,
             onFinish: { [weak self] success in

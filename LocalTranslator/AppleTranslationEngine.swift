@@ -24,23 +24,22 @@ final class AppleTranslationEngine: TranslationEngine {
     private var session: TranslationSession?
     private var sessionPair: (source: Language, target: Language)?
 
-    /// Estrategia de traducción. `.highFidelity` usa los modelos de Apple
-    /// Intelligence cuando el Mac los tiene (sin descargas de idioma extra,
-    /// ya vienen con Apple Intelligence) y cae solo a los modelos
-    /// tradicionales cuando no. Da traducciones más fluidas y cubre más
-    /// idiomas a cambio de algo más de latencia. Disponible desde macOS 26.4;
-    /// el deployment target de la app es 26.5, así que no hace falta guarda.
-    static let strategy: TranslationSession.Strategy = .highFidelity
-
-    /// Alias legible para `LanguageDownloadWindow`, que debe pedir la
-    /// descarga con la misma estrategia con la que luego se traduce.
-    static var downloadStrategy: TranslationSession.Strategy { strategy }
-
-    /// Consultor de disponibilidad de idiomas, creado una sola vez. Debe
-    /// compartir estrategia con las sesiones: si preguntáramos con una y
+    /// Consultor de disponibilidad de idiomas, creado una sola vez.
+    ///
+    /// Debe compartir estrategia con las sesiones: si preguntáramos con una y
     /// tradujéramos con otra, un `.installed` podría no corresponder a los
     /// modelos que la sesión acaba usando.
-    private let availability = LanguageAvailability(preferredStrategy: strategy)
+    ///
+    /// La estrategia `.highFidelity` (modelos de Apple Intelligence: más
+    /// fluidos y con más idiomas, sin descargas extra) llegó en macOS 26.4.
+    /// En 26.0–26.3 no existe el parámetro y el sistema usa los modelos
+    /// tradicionales, que es exactamente el comportamiento anterior.
+    private let availability: LanguageAvailability = {
+        if #available(macOS 26.4, *) {
+            return LanguageAvailability(preferredStrategy: .highFidelity)
+        }
+        return LanguageAvailability()
+    }()
 
     // MARK: - TranslationEngine
 
@@ -110,11 +109,19 @@ final class AppleTranslationEngine: TranslationEngine {
         if let session, sessionPair?.source == source, sessionPair?.target == target {
             return session
         }
-        let newSession = TranslationSession(
-            installedSource: sourceLanguage,
-            target: targetLanguage,
-            preferredStrategy: Self.strategy
-        )
+        let newSession: TranslationSession
+        if #available(macOS 26.4, *) {
+            newSession = TranslationSession(
+                installedSource: sourceLanguage,
+                target: targetLanguage,
+                preferredStrategy: .highFidelity
+            )
+        } else {
+            newSession = TranslationSession(
+                installedSource: sourceLanguage,
+                target: targetLanguage
+            )
+        }
         session = newSession
         sessionPair = (source, target)
         return newSession
