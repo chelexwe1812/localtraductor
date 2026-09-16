@@ -148,14 +148,22 @@ actor MLXEngine: TranslationEngine {
 
 // MARK: - Carga del modelo (función libre)
 
-/// Helper a nivel de archivo para invocar el macro `#huggingFaceLoadModel`
-/// fuera del actor. Hace falta porque dentro del actor `loadModel` queda
-/// resuelto a nuestro método de instancia y el macro no puede expandirse.
+/// Helper a nivel de archivo para cargar el modelo fuera del actor. Hace
+/// falta porque dentro del actor `loadModel` queda resuelto a nuestro método
+/// de instancia y los macros de MLXHuggingFace no pueden expandirse ahí.
+///
+/// No usamos el macro `#huggingFaceLoadModel`, que va contra el `HubClient`
+/// por defecto: ese cliente guarda los pesos en `Library/Caches`, que macOS
+/// puede purgar (ver `ModelStorage`). Montamos el downloader a mano con un
+/// `HubClient` cuyo caché apunta a Application Support.
 private func loadMLXModelContext(
     for configuration: ModelConfiguration,
     progressHandler: @Sendable @escaping (Progress) -> Void
 ) async throws -> ModelContext {
-    try await #huggingFaceLoadModel(
+    let hub = HubClient(cache: HubCache(cacheDirectory: ModelStorage.hubCacheDirectory))
+    return try await MLXLMCommon.loadModel(
+        from: #hubDownloader(hub),
+        using: #huggingFaceTokenizerLoader(),
         configuration: configuration,
         progressHandler: progressHandler
     )

@@ -59,7 +59,7 @@ final class WelcomeWindowController: NSObject, NSWindowDelegate {
     }
 
     func show() {
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         window.makeKeyAndOrderFront(nil)
     }
 

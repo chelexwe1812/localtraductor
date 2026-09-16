@@ -44,9 +44,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var welcomeWindow: WelcomeWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // App de barra de menús pura: sin icono en el Dock ni entrada en ⌘Tab.
-        // Equivalente en runtime a LSUIElement, sin tocar el Info.plist.
-        NSApp.setActivationPolicy(.accessory)
+        // App de barra de menús pura (sin icono en el Dock ni entrada en ⌘Tab):
+        // lo declara `LSUIElement` en el Info.plist, no una llamada a
+        // `setActivationPolicy(.accessory)` aquí. La diferencia importa al
+        // arrancar con el Mac: el Info.plist lo lee `launchd` antes de ejecutar
+        // nuestro código, así que la app nunca llega a aparecer en el Dock,
+        // mientras que hacerlo en runtime deja una ventana en la que parpadea.
+        // Antes que nada: crear la carpeta del modelo y, si venimos de una
+        // versión que lo guardaba en Library/Caches, subirlo a Application
+        // Support. Tiene que ir antes del ViewModel, cuyo init ya pregunta si
+        // el modelo está descargado — si preguntara primero, vería la carpeta
+        // nueva vacía y le ofrecería al usuario re-descargar 2,5 GB que ya
+        // tiene. El traslado es un rename dentro del contenedor, no una copia.
+        ModelStorage.prepare()
 
         Task { @MainActor in
             // ViewModel a nivel de app: el modelo MLX permanece cargado

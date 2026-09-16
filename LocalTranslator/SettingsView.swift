@@ -63,6 +63,8 @@ struct SettingsView: View {
                     }
 
                     Section("Comportamiento") {
+                        launchAtLoginRow
+
                         Toggle(isOn: $settings.autoTranslate) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Traducir automáticamente al escribir")
@@ -204,7 +206,12 @@ struct SettingsView: View {
         // El estado en disco puede cambiar fuera de esta pantalla (descarga
         // inicial de bienvenida, borrado manual del contenedor…): lo
         // releemos cada vez que se entra en Configuración.
-        .onAppear { viewModel.refreshModelStorageInfo() }
+        .onAppear {
+            viewModel.refreshModelStorageInfo()
+            // El ítem de inicio puede haberse desactivado desde Ajustes del
+            // Sistema con la app abierta: releemos el estado real al entrar.
+            settings.refreshLaunchAtLogin()
+        }
         .confirmationDialog(
             "¿Eliminar el modelo de IA descargado?",
             isPresented: $showDeleteModelConfirmation
@@ -215,6 +222,40 @@ struct SettingsView: View {
             Button("Cancelar", role: .cancel) {}
         } message: {
             Text("Se liberará el espacio que ocupa en disco. Podrás descargarlo de nuevo desde esta misma pantalla cuando lo necesites.")
+        }
+    }
+
+    // MARK: - Arranque al iniciar sesión
+
+    /// Interruptor de "abrir al iniciar sesión". El binding no escribe
+    /// directamente en `settings`: delega en `setLaunchAtLogin(_:)`, que
+    /// registra en `launchd` y luego relee el estado real, de modo que si
+    /// el sistema rechaza o deja pendiente el registro el interruptor
+    /// vuelve solo a su posición correcta.
+    @ViewBuilder
+    private var launchAtLoginRow: some View {
+        Toggle(isOn: Binding(
+            get: { settings.launchAtLogin },
+            set: { settings.setLaunchAtLogin($0) }
+        )) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Abrir al iniciar sesión")
+                Text("LocalTranslator arranca solo al encender el Mac y queda listo en la barra de menús.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if settings.launchAtLoginNeedsApproval {
+                    Button("Autorizar en Ajustes del Sistema…") {
+                        LaunchAtLogin.openSystemSettings()
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                }
+                if let error = settings.launchAtLoginError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
         }
     }
 

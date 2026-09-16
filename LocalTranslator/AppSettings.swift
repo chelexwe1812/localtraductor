@@ -209,6 +209,23 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(hasShownWelcome, forKey: Keys.hasShownWelcome) }
     }
 
+    /// Arrancar LocalTranslator al iniciar sesión en el Mac.
+    ///
+    /// No se persiste en `UserDefaults`: quien manda es `launchd` a través
+    /// de `SMAppService`, porque el usuario puede revocar el permiso desde
+    /// Ajustes del Sistema sin pasar por la app. Guardamos aquí una copia
+    /// observable para que SwiftUI la pinte, y la resincronizamos con
+    /// `refreshLaunchAtLogin()` cada vez que se abre Configuración.
+    private(set) var launchAtLogin: Bool
+
+    /// El registro existe pero el usuario aún debe aprobarlo en Ajustes
+    /// del Sistema. Mientras sea `true`, la app no arrancará sola.
+    private(set) var launchAtLoginNeedsApproval: Bool
+
+    /// Mensaje del último fallo al registrar/desregistrar el ítem de inicio.
+    /// `nil` cuando la última operación fue bien.
+    private(set) var launchAtLoginError: String?
+
     private init() {
         let d = UserDefaults.standard
         // .bool(forKey:) devuelve false si no existe → defaults seguros.
@@ -248,6 +265,32 @@ final class AppSettings {
             self.translationEngineKind = .localLLM
         }
         self.hasShownWelcome = d.bool(forKey: Keys.hasShownWelcome)
+        self.launchAtLogin = LaunchAtLogin.isEnabled
+        self.launchAtLoginNeedsApproval = LaunchAtLogin.requiresApproval
+    }
+
+    // MARK: - Arranque al iniciar sesión
+
+    /// Registra o desregistra la app en `launchd` y refleja el resultado
+    /// real (no el pedido) en `launchAtLogin`: si el sistema deja el ítem
+    /// pendiente de aprobación o el registro falla, el interruptor vuelve
+    /// a su sitio en vez de mentir al usuario.
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try LaunchAtLogin.setEnabled(enabled)
+            launchAtLoginError = nil
+        } catch {
+            launchAtLoginError = error.localizedDescription
+        }
+        refreshLaunchAtLogin()
+    }
+
+    /// Relee el estado desde el sistema. Necesario porque el usuario puede
+    /// desactivar el ítem de inicio en Ajustes del Sistema con la app ya
+    /// abierta.
+    func refreshLaunchAtLogin() {
+        launchAtLogin = LaunchAtLogin.isEnabled
+        launchAtLoginNeedsApproval = LaunchAtLogin.requiresApproval
     }
 
     /// Lee un `Bool` aplicando un default explícito cuando la clave nunca se
