@@ -1,6 +1,39 @@
 {
   "sourceLanguage" : "es",
   "strings" : {
+    "Abrir al iniciar sesión" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open at Login"
+          }
+        }
+      }
+    },
+    "Autorizar en Ajustes del Sistema…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approve in System Settings…"
+          }
+        }
+      }
+    },
+    "LocalTranslator arranca solo al encender el Mac y queda listo en la barra de menús." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LocalTranslator starts automatically when you turn on your Mac and waits in the menu bar."
+          }
+        }
+      }
+    },
     "" : {
 
     },

@@ -384,6 +384,9 @@ private struct SiriGlow: View {
     /// Velocidad de giro del gradiente, en grados por segundo.
     private let rotationSpeed: Double = 220
 
+    /// Intervalo mínimo entre frames del halo (30 fps).
+    private static let frameInterval: Double = 1.0 / 30.0
+
     /// Paleta Siri: rosas, rojos, amarillo cálido, blanco, celestes,
     /// morados. Nada de mint. Termina en el mismo morado para que la
     /// transición al envolver sea suave.
@@ -394,7 +397,12 @@ private struct SiriGlow: View {
     var body: some View {
         ZStack {
             if rendered {
-                TimelineView(.animation) { timeline in
+                // Limitamos el repintado a `frameInterval` en vez de dejar el
+                // schedule libre: sin tope, `.animation` redibuja a la tasa del
+                // display (120 Hz en ProMotion) y cada frame rasteriza dos
+                // `blur()` fuera de pantalla durante toda la traducción. A 30 fps
+                // un gradiente difuminado que gira se ve idéntico.
+                TimelineView(.animation(minimumInterval: Self.frameInterval)) { timeline in
                     let angle = timeline.date.timeIntervalSince(startDate) * rotationSpeed
                     let gradient = AngularGradient(
                         colors: siriColors,

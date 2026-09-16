@@ -35,7 +35,11 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         self.onPopoverDidClose = onPopoverDidClose
         self.onPopoverWillShow = onPopoverWillShow
         self.onOpenSettings = onOpenSettings
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        // `variableLength` y no `squareLength`: el glifo ⽂A es más ancho que
+        // alto (5:4), así que en un hueco cuadrado se vería encajonado o
+        // recortado. Con longitud variable el item se ajusta al ancho real
+        // del icono y queda alineado en altura con el resto de la barra.
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         popover = NSPopover()
         // Tamaño fijo, igual al frame que declara ContentView: el popover
@@ -50,11 +54,15 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         popover.delegate = self
 
         if let button = statusItem.button {
-            // Icono propio (PDF vectorial monocromo) en modo template:
-            // macOS usa solo su canal alfa y lo tiñe según la apariencia
-            // de la barra (claro/oscuro) y el estado resaltado.
+            // Icono propio en modo template: macOS usa solo su canal alfa y
+            // lo tiñe según la apariencia de la barra (claro/oscuro) y el
+            // estado resaltado, así que el arte debe ser negro sobre
+            // transparente — nunca sobre blanco, o saldría un bloque sólido.
+            //
+            // El tamaño respeta la proporción del arte (20×16 pt para un
+            // glifo 5:4). Fijar aquí un cuadrado lo deformaría.
             let icon = NSImage(named: "MenuBarIcon")
-            icon?.size = NSSize(width: 18, height: 18)
+            icon?.size = NSSize(width: 20, height: 16)
             icon?.isTemplate = true
             icon?.accessibilityDescription = "LocalTranslator"
             button.image = icon
@@ -111,7 +119,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         // Avisamos antes de mostrar para que el ViewModel pueda preparar el
         // estado (p.ej. auto-pegar el portapapeles si procede).
         onPopoverWillShow()
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         // Pasamos foco a la ventana del popover para que reciba teclas.
         popover.contentViewController?.view.window?.makeKey()

@@ -95,6 +95,14 @@ final class TranslationViewModel {
     private let debounceDelay: Duration = .milliseconds(450)
     private let languageRecognizer = NLLanguageRecognizer()
 
+    /// Cada cuánto, como máximo, se refresca `outputText` mientras llega el
+    /// stream del modelo. 50 ms (~20 fps) es más rápido de lo que se percibe
+    /// como texto apareciendo, y recorta el trabajo de render y de
+    /// `MarkdownCodePreserver.restore` en un orden de magnitud frente a
+    /// publicar token a token. El texto final siempre se escribe entero al
+    /// cerrarse el stream, así que no se pierde nada.
+    private static let streamPublishInterval: Duration = .milliseconds(50)
+
     /// `true` cuando el modelo LLM ya está cargado en RAM. Permite volver
     /// al motor de IA sin recargar si ya se cargó en esta sesión.
     private var llmLoaded = false
@@ -387,9 +395,18 @@ final class TranslationViewModel {
                     tone: toneSnapshot
                 )
                 var buffer = ""
+                var lastPublish = ContinuousClock.now
                 for try await chunk in stream {
                     try Task.checkCancellation()
                     buffer += chunk
+                    // Publicamos como mucho cada `streamPublishInterval`, no en
+                    // cada token. Cada publicación cuesta un re-render completo
+                    // del ScrollView más un `restore()` sobre TODO el buffer
+                    // acumulado (O(longitud × bloques)), así que hacerlo por
+                    // token es trabajo cuadrático que el ojo no llega a ver.
+                    let now = ContinuousClock.now
+                    guard now - lastPublish >= Self.streamPublishInterval else { continue }
+                    lastPublish = now
                     // Restauramos placeholders dentro del buffer parcial para
                     // que el código aparezca tal cual mientras se streamea.
                     self.outputText = MarkdownCodePreserver.restore(buffer, with: preservedBlocks)

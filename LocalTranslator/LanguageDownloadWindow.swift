@@ -31,9 +31,14 @@ final class LanguageDownloadWindowController {
         onFinish = completion
 
         let view = LanguageDownloadView(
+            // Misma estrategia que usa `AppleTranslationEngine` al traducir:
+            // si pidiéramos la descarga con una estrategia y tradujéramos con
+            // otra, el sistema podría preparar unos modelos y la sesión pedir
+            // otros, dejando al usuario en un bucle de descarga.
             configuration: TranslationSession.Configuration(
                 source: sourceLanguage,
-                target: targetLanguage
+                target: targetLanguage,
+                preferredStrategy: AppleTranslationEngine.downloadStrategy
             ),
             sourceName: source.englishName,
             targetName: target.englishName,
@@ -53,7 +58,7 @@ final class LanguageDownloadWindowController {
         window.center()
         self.window = window
 
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         window.makeKeyAndOrderFront(nil)
     }
 
